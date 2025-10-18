@@ -40,6 +40,9 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <cmath>
+#include <cassert>
 
 using namespace Eigen;
 using namespace std;
@@ -478,16 +481,96 @@ VectorXd Trajectory::getPosition(double time) const {
 }
 
 VectorXd Trajectory::getVelocity(double time) const {
-	list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
-	list<TrajectoryStep>::const_iterator previous = it;
-	previous--;
-		
-	double timeStep = it->time - previous->time;
-	const double acceleration = 2.0 * (it->pathPos - previous->pathPos - timeStep * previous->pathVel) / (timeStep * timeStep);
+        list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
+        list<TrajectoryStep>::const_iterator previous = it;
+        previous--;
 
-	timeStep = time - previous->time;
-	const double pathPos = previous->pathPos + timeStep * previous->pathVel + 0.5 * timeStep * timeStep * acceleration; 
-	const double pathVel = previous->pathVel + timeStep * acceleration;
-	
-	return path.getTangent(pathPos) * pathVel;
+        double timeStep = it->time - previous->time;
+        const double acceleration = 2.0 * (it->pathPos - previous->pathPos - timeStep * previous->pathVel) / (timeStep * timeStep);
+
+        timeStep = time - previous->time;
+        const double pathPos = previous->pathPos + timeStep * previous->pathVel + 0.5 * timeStep * timeStep * acceleration;
+        const double pathVel = previous->pathVel + timeStep * acceleration;
+
+        return path.getTangent(pathPos) * pathVel;
+}
+
+std::vector<Trajectory::PhaseSample> Trajectory::samplePhaseTrajectory(double sampleTimeStep) const
+{
+        std::vector<PhaseSample> samples;
+        if(!valid || trajectory.size() < 2) {
+                return samples;
+        }
+
+        const double duration = getDuration();
+        if(sampleTimeStep <= 0.0) {
+                sampleTimeStep = timeStep;
+        }
+
+        auto previous = trajectory.begin();
+        auto current = previous;
+        current++;
+
+        const std::size_t numSamples = static_cast<std::size_t>(std::ceil(duration / sampleTimeStep)) + 1;
+        samples.reserve(numSamples + 1);
+
+        double t = 0.0;
+        for(std::size_t index = 0; index < numSamples; ++index) {
+                double sampleTime = std::min(t, duration);
+
+                while(current != trajectory.end() && sampleTime > current->time + eps) {
+                        previous = current;
+                        current++;
+                }
+
+                if(current == trajectory.end()) {
+                        current--;
+                        previous = current;
+                        previous--;
+                }
+
+                double segmentDuration = current->time - previous->time;
+                if(segmentDuration <= 0.0) {
+                        samples.push_back({sampleTime, previous->pathPos, previous->pathVel, 0.0});
+                }
+                else {
+                        double acceleration = 2.0 * (current->pathPos - previous->pathPos - segmentDuration * previous->pathVel)
+                                / (segmentDuration * segmentDuration);
+                        double localTime = sampleTime - previous->time;
+                        if(localTime < 0.0) {
+                                localTime = 0.0;
+                        }
+                        if(localTime > segmentDuration) {
+                                localTime = segmentDuration;
+                        }
+
+                        double pathPos = previous->pathPos + localTime * previous->pathVel + 0.5 * localTime * localTime * acceleration;
+                        double pathVel = previous->pathVel + localTime * acceleration;
+
+                        samples.push_back({sampleTime, pathPos, pathVel, acceleration});
+                }
+
+                t += sampleTimeStep;
+        }
+
+        if(samples.empty() || samples.back().time < duration) {
+                auto lastIt = trajectory.end();
+                --lastIt;
+                auto beforeLastIt = lastIt;
+                --beforeLastIt;
+
+                const TrajectoryStep &last = *lastIt;
+                const TrajectoryStep &beforeLast = *beforeLastIt;
+
+                double segmentDuration = last.time - beforeLast.time;
+                double acceleration = 0.0;
+                if(segmentDuration > 0.0) {
+                        acceleration = 2.0 * (last.pathPos - beforeLast.pathPos - segmentDuration * beforeLast.pathVel)
+                                / (segmentDuration * segmentDuration);
+                }
+
+                samples.push_back({duration, last.pathPos, last.pathVel, acceleration});
+        }
+
+        return samples;
 }

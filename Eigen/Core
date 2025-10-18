@@ -1,0 +1,206 @@
+#pragma once
+
+#include <algorithm>
+#include <cmath>
+#include <initializer_list>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+namespace Eigen
+{
+
+class VectorXd
+{
+public:
+        using value_type = double;
+
+        VectorXd() = default;
+
+        explicit VectorXd(std::size_t size) : values(size, 0.0) {}
+
+        VectorXd(const VectorXd &) = default;
+        VectorXd(VectorXd &&) noexcept = default;
+        VectorXd &operator=(const VectorXd &) = default;
+        VectorXd &operator=(VectorXd &&) noexcept = default;
+
+        std::size_t size() const
+        {
+                return values.size();
+        }
+
+        void resize(std::size_t newSize)
+        {
+                values.resize(newSize, 0.0);
+        }
+
+        double &operator[](std::size_t index)
+        {
+                return values.at(index);
+        }
+
+        const double &operator[](std::size_t index) const
+        {
+                return values.at(index);
+        }
+
+        VectorXd &operator+=(const VectorXd &other)
+        {
+                checkSize(other.size());
+                for(std::size_t i = 0; i < values.size(); ++i)
+                {
+                        values[i] += other.values[i];
+                }
+                return *this;
+        }
+
+        VectorXd &operator-=(const VectorXd &other)
+        {
+                checkSize(other.size());
+                for(std::size_t i = 0; i < values.size(); ++i)
+                {
+                        values[i] -= other.values[i];
+                }
+                return *this;
+        }
+
+        VectorXd &operator*=(double scalar)
+        {
+                for(double &value : values)
+                {
+                        value *= scalar;
+                }
+                return *this;
+        }
+
+        VectorXd &operator/=(double scalar)
+        {
+                for(double &value : values)
+                {
+                        value /= scalar;
+                }
+                return *this;
+        }
+
+        VectorXd operator+(const VectorXd &other) const
+        {
+                VectorXd result(*this);
+                result += other;
+                return result;
+        }
+
+        VectorXd operator-(const VectorXd &other) const
+        {
+                VectorXd result(*this);
+                result -= other;
+                return result;
+        }
+
+        VectorXd operator-() const
+        {
+                VectorXd result(*this);
+                for(double &value : result.values)
+                {
+                        value = -value;
+                }
+                return result;
+        }
+
+        VectorXd operator*(double scalar) const
+        {
+                VectorXd result(*this);
+                result *= scalar;
+                return result;
+        }
+
+        VectorXd operator/(double scalar) const
+        {
+                VectorXd result(*this);
+                result /= scalar;
+                return result;
+        }
+
+        double dot(const VectorXd &other) const
+        {
+                checkSize(other.size());
+                double result = 0.0;
+                for(std::size_t i = 0; i < values.size(); ++i)
+                {
+                        result += values[i] * other.values[i];
+                }
+                return result;
+        }
+
+        double norm() const
+        {
+                return std::sqrt(this->dot(*this));
+        }
+
+        VectorXd normalized() const
+        {
+                const double n = norm();
+                if(n == 0.0)
+                {
+                        return VectorXd::Zero(size());
+                }
+                return (*this) / n;
+        }
+
+        VectorXd &setZero()
+        {
+                std::fill(values.begin(), values.end(), 0.0);
+                return *this;
+        }
+
+        static VectorXd Zero(std::size_t size)
+        {
+                VectorXd vector(size);
+                vector.setZero();
+                return vector;
+        }
+
+private:
+        void checkSize(std::size_t other) const
+        {
+                if(other != values.size())
+                {
+                        throw std::runtime_error("VectorXd size mismatch");
+                }
+        }
+
+        std::vector<double> values;
+};
+
+inline VectorXd operator*(double scalar, const VectorXd &vector)
+{
+        return vector * scalar;
+}
+
+struct VectorSetter
+{
+        VectorSetter(VectorXd &vector, std::size_t index) : vector(vector), index(index) {}
+        VectorSetter &operator,(double value)
+        {
+                if(index < vector.size())
+                {
+                        vector[index] = value;
+                }
+                ++index;
+                return *this;
+        }
+
+        VectorXd &vector;
+        std::size_t index;
+};
+
+inline VectorSetter operator<<(VectorXd &vector, double value)
+{
+        if(vector.size() > 0)
+        {
+                vector[0] = value;
+        }
+        return VectorSetter(vector, 1);
+}
+
+} // namespace Eigen
+
