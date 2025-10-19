@@ -1,5 +1,7 @@
 #include <cstdlib>
 #include <list>
+#include <iostream>
+#include <sstream>
 #include <Eigen/Core>
 #include "Trajectory.h"
 

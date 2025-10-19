@@ -1,0 +1,172 @@
+#pragma once
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <initializer_list>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+namespace Eigen {
+
+class VectorXd {
+public:
+        /// \brief 默认构造函数，生成长度为 0 的向量。
+        VectorXd() = default;
+
+        /// \brief 根据给定维度构造并将所有元素置零。
+        explicit VectorXd(std::size_t size) : data_(size, 0.0) {}
+
+        /// \brief 允许拷贝和赋值使用标准语义。
+        VectorXd(const VectorXd &) = default;
+        VectorXd &operator=(const VectorXd &) = default;
+
+        /// \brief 获取向量元素个数。
+        std::size_t size() const { return data_.size(); }
+
+        /// \brief 重设所有元素为零。
+        void setZero() { std::fill(data_.begin(), data_.end(), 0.0); }
+
+        /// \brief 允许按下标访问元素（可修改）。
+        double &operator[](std::size_t index) { return data_.at(index); }
+
+        /// \brief 允许按下标访问元素（只读）。
+        const double &operator[](std::size_t index) const { return data_.at(index); }
+
+        /// \brief 生成给定长度的零向量。
+        static VectorXd Zero(std::size_t size) { return VectorXd(size); }
+
+        /// \brief 便捷操作：支持 Eigen 风格的“<<” 赋值。
+        class Inserter {
+        public:
+                Inserter(VectorXd &vec, std::size_t index) : vec_(vec), index_(index) {}
+
+                Inserter &operator,(double value) {
+                        if(index_ >= vec_.size()) {
+                                throw std::out_of_range("Too many values provided to VectorXd::operator<<");
+                        }
+                        vec_[index_++] = value;
+                        return *this;
+                }
+
+        private:
+                VectorXd &vec_;
+                std::size_t index_;
+        };
+
+        Inserter operator<<(double value) {
+                if(size() == 0) {
+                        throw std::out_of_range("Cannot stream values into empty VectorXd");
+                }
+                data_[0] = value;
+                return Inserter(*this, 1);
+        }
+
+        /// \brief 计算与另一个向量的点积。
+        double dot(const VectorXd &other) const {
+                checkSameSize(other);
+                double result = 0.0;
+                for(std::size_t i = 0; i < data_.size(); ++i) {
+                        result += data_[i] * other.data_[i];
+                }
+                return result;
+        }
+
+        /// \brief 计算欧几里得范数。
+        double norm() const { return std::sqrt(dot(*this)); }
+
+        /// \brief 返回归一化后的向量；若长度近零则返回零向量。
+        VectorXd normalized() const;
+
+        /// \brief 向量逐元素加法。
+        VectorXd &operator+=(const VectorXd &other) {
+                checkSameSize(other);
+                for(std::size_t i = 0; i < data_.size(); ++i) {
+                        data_[i] += other.data_[i];
+                }
+                return *this;
+        }
+
+        /// \brief 向量逐元素减法。
+        VectorXd &operator-=(const VectorXd &other) {
+                checkSameSize(other);
+                for(std::size_t i = 0; i < data_.size(); ++i) {
+                        data_[i] -= other.data_[i];
+                }
+                return *this;
+        }
+
+        /// \brief 向量按标量放缩。
+        VectorXd &operator*=(double scalar) {
+                for(double &value : data_) {
+                        value *= scalar;
+                }
+                return *this;
+        }
+
+        /// \brief 向量按标量缩放（除法）。
+        VectorXd &operator/=(double scalar) {
+                for(double &value : data_) {
+                        value /= scalar;
+                }
+                return *this;
+        }
+
+        /// \brief 支持通过标准容器接口获取原始数据指针（只读）。
+        const double *data() const { return data_.data(); }
+
+private:
+        void checkSameSize(const VectorXd &other) const {
+                if(data_.size() != other.data_.size()) {
+                        throw std::invalid_argument("Vector sizes do not match");
+                }
+        }
+
+        std::vector<double> data_;
+};
+
+inline VectorXd operator+(VectorXd lhs, const VectorXd &rhs) {
+        lhs += rhs;
+        return lhs;
+}
+
+inline VectorXd operator-(VectorXd lhs, const VectorXd &rhs) {
+        lhs -= rhs;
+        return lhs;
+}
+
+inline VectorXd operator*(const VectorXd &vec, double scalar) {
+        VectorXd result(vec);
+        result *= scalar;
+        return result;
+}
+
+inline VectorXd operator*(double scalar, const VectorXd &vec) {
+        return vec * scalar;
+}
+
+inline VectorXd operator/(const VectorXd &vec, double scalar) {
+        VectorXd result(vec);
+        result /= scalar;
+        return result;
+}
+
+inline VectorXd operator-(const VectorXd &vec) {
+        VectorXd result(vec);
+        for(std::size_t i = 0; i < result.size(); ++i) {
+                result[i] = -result[i];
+        }
+        return result;
+}
+
+inline VectorXd VectorXd::normalized() const {
+        double n = norm();
+        if(n <= 0.0) {
+                return VectorXd(size());
+        }
+        return (*this) / n;
+}
+
+} // namespace Eigen
+

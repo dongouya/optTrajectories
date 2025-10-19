@@ -39,13 +39,21 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <vector>
 #include "Path.h"
 
 class Trajectory
 {
 public:
-	// Generates a time-optimal trajectory
-	Trajectory(const Path &path, const Eigen::VectorXd &maxVelocity, const Eigen::VectorXd &maxAcceleration, double timeStep = 0.001);
+        struct Sample {
+                double time;          ///< 离散时间戳。
+                double position;      ///< 路径参数 s(t)。
+                double velocity;      ///< 路径速度 \dot{s}(t)。
+                double acceleration;  ///< 路径加速度 \ddot{s}(t)。
+        };
+
+        // Generates a time-optimal trajectory
+        Trajectory(const Path &path, const Eigen::VectorXd &maxVelocity, const Eigen::VectorXd &maxAcceleration, double timeStep = 0.001);
 	
 	~Trajectory(void);
 
@@ -58,10 +66,14 @@ public:
 
 	// Return the position/configuration or velocity vector of the robot for a given point in time within the trajectory.
 	Eigen::VectorXd getPosition(double time) const;
-	Eigen::VectorXd getVelocity(double time) const;
+        Eigen::VectorXd getVelocity(double time) const;
 
-	// Outputs the phase trajectory and the velocity limit curve in 2 files for debugging purposes.
-	void outputPhasePlaneTrajectory() const;
+        // Uniformly sample the path parameter time law at the provided period.
+        // 均匀采样 s(t) 时间律，供 FIR 平滑与分析使用。
+        std::vector<Sample> sampleTimeLaw(double samplePeriod) const;
+
+        // Outputs the phase trajectory and the velocity limit curve in 2 files for debugging purposes.
+        void outputPhasePlaneTrajectory() const;
 
 private:
 	struct TrajectoryStep {
@@ -87,9 +99,10 @@ private:
 	double getAccelerationMaxPathVelocityDeriv(double pathPos);
 	double getVelocityMaxPathVelocityDeriv(double pathPos);
 	
-	std::list<TrajectoryStep>::const_iterator getTrajectorySegment(double time) const;
-	
-	Path path;
+        std::list<TrajectoryStep>::const_iterator getTrajectorySegment(double time) const;
+        void evaluatePathState(double time, double &pathPos, double &pathVel, double &pathAccel) const;
+
+        Path path;
 	Eigen::VectorXd maxVelocity;
 	Eigen::VectorXd maxAcceleration;
 	unsigned int n;

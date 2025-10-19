@@ -1,0 +1,8 @@
+#pragma once
+
+#include "Core"
+
+namespace Eigen {
+// 本简化实现仅需向量算法，几何模块继续复用 Core 中的 VectorXd。
+}
+
