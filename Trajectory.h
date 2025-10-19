@@ -44,8 +44,8 @@
 class Trajectory
 {
 public:
-	// Generates a time-optimal trajectory
-	Trajectory(const Path &path, const Eigen::VectorXd &maxVelocity, const Eigen::VectorXd &maxAcceleration, double timeStep = 0.001);
+        // Generates a time-optimal trajectory
+        Trajectory(const Path &path, const Eigen::VectorXd &maxVelocity, const Eigen::VectorXd &maxAcceleration, double timeStep = 0.001);
 	
 	~Trajectory(void);
 
@@ -53,12 +53,26 @@ public:
 	// If this method returns false, all other methods have undefined behavior.
 	bool isValid() const;
 
-	// Returns the optimal duration of the trajectory
-	double getDuration() const;
+        // Returns the optimal duration of the trajectory
+        double getDuration() const;
 
-	// Return the position/configuration or velocity vector of the robot for a given point in time within the trajectory.
-	Eigen::VectorXd getPosition(double time) const;
-	Eigen::VectorXd getVelocity(double time) const;
+        // Return the position/configuration or velocity vector of the robot for a given point in time within the trajectory.
+        Eigen::VectorXd getPosition(double time) const;
+        Eigen::VectorXd getVelocity(double time) const;
+
+        struct PhaseSample
+        {
+                double time;
+                double pathPos;
+                double pathVel;
+                double pathAcc;
+        };
+
+        // Sample the internal path parameterization on a uniform time grid.  The jerk
+        // smoothing pipeline consumes the returned array directly, so we expose path
+        // position/velocity/acceleration alongside the time stamps.
+        // The returned samples always contain the first and the last point of the trajectory.
+        std::vector<PhaseSample> samplePhaseTrajectory(double sampleTimeStep) const;
 
 	// Outputs the phase trajectory and the velocity limit curve in 2 files for debugging purposes.
 	void outputPhasePlaneTrajectory() const;

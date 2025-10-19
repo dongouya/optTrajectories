@@ -1,0 +1,30 @@
+Sample count: 2640, last time: 13.1936
+Last original samples (time, s, s_dot, s_ddot):
+13.1750    9.6701    0.0263   -1.4142
+13.1800    9.6702    0.0193   -1.4142
+13.1850    9.6702    0.0122   -1.4142
+13.1900    9.6703    0.0051   -1.4142
+13.1936    9.6703   -0.0000   -1.4142
+Reconstructed end state from original acceleration: 9.6121, -0.0009
+Original end state (s, s_dot): 9.6703, -0.0000
+Original max jerk : 570.2830
+Filtered max jerk : 5.0000
+Endpoint velocity error : 0.0000
+Endpoint position error : 0.0000
+
+First five samples (time, s, s_dot, s_ddot) after smoothing:
+0.0000    0.0000    0.0000    1.0198
+0.0050    0.0000    0.0051    1.0196
+0.0100    0.0001    0.0102    1.0195
+0.0150    0.0001    0.0153    1.0193
+0.0200    0.0002    0.0204    1.0192
+
+Last five samples after smoothing:
+13.1750    9.6700    0.0308   -1.6523
+13.1800    9.6701    0.0225   -1.6525
+13.1850    9.6702    0.0142   -1.6526
+13.1900    9.6703    0.0060   -1.6528
+13.1936    9.6703    0.0000   -1.6529
+
+Jerk constraint satisfied: yes
+Endpoints preserved: yes
