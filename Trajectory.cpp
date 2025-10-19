@@ -40,6 +40,9 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <cmath>
+#include <cassert>
 
 using namespace Eigen;
 using namespace std;
@@ -446,10 +449,10 @@ double Trajectory::getDuration() const {
 }
 
 list<Trajectory::TrajectoryStep>::const_iterator Trajectory::getTrajectorySegment(double time) const {
-	if(time >= trajectory.back().time) {
-		list<TrajectoryStep>::const_iterator last = trajectory.end();
-		last--;
-		return last;
+        if(time >= trajectory.back().time) {
+                list<TrajectoryStep>::const_iterator last = trajectory.end();
+                last--;
+                return last;
 	}
 	else {
 		if(time < cachedTime) {
@@ -478,16 +481,98 @@ VectorXd Trajectory::getPosition(double time) const {
 }
 
 VectorXd Trajectory::getVelocity(double time) const {
-	list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
-	list<TrajectoryStep>::const_iterator previous = it;
-	previous--;
-		
-	double timeStep = it->time - previous->time;
-	const double acceleration = 2.0 * (it->pathPos - previous->pathPos - timeStep * previous->pathVel) / (timeStep * timeStep);
+        list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
+        list<TrajectoryStep>::const_iterator previous = it;
+        previous--;
 
-	timeStep = time - previous->time;
-	const double pathPos = previous->pathPos + timeStep * previous->pathVel + 0.5 * timeStep * timeStep * acceleration; 
-	const double pathVel = previous->pathVel + timeStep * acceleration;
-	
-	return path.getTangent(pathPos) * pathVel;
+        double timeStep = it->time - previous->time;
+        const double acceleration = 2.0 * (it->pathPos - previous->pathPos - timeStep * previous->pathVel) / (timeStep * timeStep);
+
+        timeStep = time - previous->time;
+        const double pathPos = previous->pathPos + timeStep * previous->pathVel + 0.5 * timeStep * timeStep * acceleration;
+        const double pathVel = previous->pathVel + timeStep * acceleration;
+
+        return path.getTangent(pathPos) * pathVel;
+}
+
+void Trajectory::evaluatePathState(double time, double &pathPos, double &pathVel, double &pathAccel) const {
+        if(trajectory.empty()) {
+                pathPos = 0.0;
+                pathVel = 0.0;
+                pathAccel = 0.0;
+                return;
+        }
+
+        list<TrajectoryStep>::const_iterator it = getTrajectorySegment(time);
+        list<TrajectoryStep>::const_iterator previous = it;
+        if(it == trajectory.begin()) {
+                pathPos = it->pathPos;
+                pathVel = it->pathVel;
+                pathAccel = 0.0;
+                return;
+        }
+        previous--;
+
+        double segmentDuration = it->time - previous->time;
+        if(segmentDuration <= 0.0) {
+                pathPos = previous->pathPos;
+                pathVel = previous->pathVel;
+                pathAccel = 0.0;
+                return;
+        }
+
+        const double acceleration = 2.0 * (it->pathPos - previous->pathPos - segmentDuration * previous->pathVel)
+                / (segmentDuration * segmentDuration);
+        double tau = time - previous->time;
+        if(tau < 0.0) {
+                tau = 0.0;
+        }
+        if(tau > segmentDuration) {
+                tau = segmentDuration;
+        }
+
+        pathAccel = acceleration;
+        pathPos = previous->pathPos + tau * previous->pathVel + 0.5 * tau * tau * acceleration;
+        pathVel = previous->pathVel + tau * acceleration;
+}
+
+std::vector<Trajectory::Sample> Trajectory::sampleTimeLaw(double samplePeriod) const {
+        std::vector<Sample> samples;
+        if(!valid || trajectory.empty()) {
+                return samples;
+        }
+
+        const double duration = getDuration();
+        if(duration <= 0.0) {
+                Sample sample;
+                sample.time = 0.0;
+                evaluatePathState(0.0, sample.position, sample.velocity, sample.acceleration);
+                samples.push_back(sample);
+                return samples;
+        }
+
+        if(samplePeriod <= 0.0) {
+                samplePeriod = timeStep;
+        }
+        if(samplePeriod <= 0.0) {
+                samplePeriod = 0.001;
+        }
+
+        size_t intervals = static_cast<size_t>(ceil(duration / samplePeriod));
+        if(intervals == 0) {
+                intervals = 1;
+        }
+        const double dt = duration / static_cast<double>(intervals);
+
+        samples.reserve(intervals + 1);
+        double time = 0.0;
+        for(size_t i = 0; i <= intervals; ++i) {
+                double queryTime = (i == intervals) ? duration : time;
+                Sample sample;
+                sample.time = queryTime;
+                evaluatePathState(queryTime, sample.position, sample.velocity, sample.acceleration);
+                samples.push_back(sample);
+                time += dt;
+        }
+        return samples;
 }

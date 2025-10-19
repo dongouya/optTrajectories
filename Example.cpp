@@ -41,10 +41,12 @@
 #include <Eigen/Core>
 #include "Trajectory.h"
 #include "Path.h"
+#include "FirSmoother.h"
 
 using namespace std;
 using namespace Eigen;
 
+// 主程序：构造若干路径点，生成 Kunz TOTG 轨迹并展示 FIR 平滑效果。
 int main() {
 	list<VectorXd> waypoints;
 	VectorXd waypoint(3);
@@ -68,22 +70,37 @@ int main() {
 	VectorXd maxVelocity(3);
 	maxVelocity << 1.0, 1.0, 1.0;
 
-	Trajectory trajectory(Path(waypoints, 0.1), maxVelocity, maxAcceleration);
-	trajectory.outputPhasePlaneTrajectory();
-	if(trajectory.isValid()) {
-		double duration = trajectory.getDuration();
-		cout << "Trajectory duration: " << duration << " s" << endl << endl;
+        // 构造 Kunz TOTG 轨迹并输出调试文件，便于查看极限曲线。
+        Trajectory trajectory(Path(waypoints, 0.1), maxVelocity, maxAcceleration);
+        trajectory.outputPhasePlaneTrajectory();
+        if(trajectory.isValid()) {
+                double duration = trajectory.getDuration();
+                cout << "Trajectory duration: " << duration << " s" << endl << endl;
 		cout << "Time      Position                  Velocity" << endl;
 		for(double t = 0.0; t < duration; t += 0.1) {
 			printf("%6.4f   %7.4f %7.4f %7.4f   %7.4f %7.4f %7.4f\n", t, trajectory.getPosition(t)[0], trajectory.getPosition(t)[1], trajectory.getPosition(t)[2],
 				trajectory.getVelocity(t)[0], trajectory.getVelocity(t)[1], trajectory.getVelocity(t)[2]);
-		}
-		printf("%6.4f   %7.4f %7.4f %7.4f   %7.4f %7.4f %7.4f\n", duration, trajectory.getPosition(duration)[0], trajectory.getPosition(duration)[1], trajectory.getPosition(duration)[2],
-			trajectory.getVelocity(duration)[0], trajectory.getVelocity(duration)[1], trajectory.getVelocity(duration)[2]);
-	}
-	else {
-		cout << "Trajectory generation failed." << endl;
-	}
+                }
+                printf("%6.4f   %7.4f %7.4f %7.4f   %7.4f %7.4f %7.4f\n", duration, trajectory.getPosition(duration)[0], trajectory.getPosition(duration)[1], trajectory.getPosition(duration)[2],
+                        trajectory.getVelocity(duration)[0], trajectory.getVelocity(duration)[1], trajectory.getVelocity(duration)[2]);
+
+                // 配置 FIR 平滑器，限制 jerk 并允许适度的时间伸缩。
+                FirSmoother smoother;
+                FirSmoothingConfig config;
+                config.samplePeriod = 0.002;
+                config.primaryKernelLength = 41;
+                config.enableSecondStage = true;
+                config.secondaryKernelLength = 31;
+                config.jerkLimit = 30.0;
+
+                SmoothedTimeLaw smoothed = smoother.smooth(trajectory, config);
+                cout << "Smoothed duration: " << smoothed.diagnostics.smoothedDuration << " s" << endl;
+                cout << "Time scale applied: " << smoothed.diagnostics.timeScale << endl;
+                cout << "Jerk peak: " << smoothed.diagnostics.jerkPeak << "  RMS: " << smoothed.diagnostics.jerkRms << endl;
+        }
+        else {
+                cout << "Trajectory generation failed." << endl;
+        }
 
 	string s;
 	cin >> s;
